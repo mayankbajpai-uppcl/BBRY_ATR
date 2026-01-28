@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BBRY ATR Capture</title>
+<style>
+:root { --primary:#1f3c88; --bg:#f4f6f9; --text:#333; }
+* { box-sizing:border-box; }
+body { margin:0; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial; background:var(--bg); color:var(--text);}
+.app { max-width:420px; margin:auto; background:#fff; min-height:100vh; padding:20px; }
+.header { text-align:center; padding-bottom:10px; border-bottom:1px solid #ddd; }
+.header h1 { margin:0; font-size:22px; color:var(--primary); }
+.header p { font-size:13px; color:#666; }
+.field { margin-top:18px; }
+.field label { font-weight:600; font-size:14px; display:block; margin-bottom:6px; }
+.field input { width:100%; padding:12px; font-size:16px; border-radius:8px; border:1px solid #ccc; }
+.field input:focus { outline:none; border-color:var(--primary); }
+.camera input { padding:10px; }
+.status { font-size:13px; color:#555; margin-top:10px; }
+button { width:100%; margin-top:24px; padding:14px; font-size:18px; background:var(--primary); color:white; border:none; border-radius:10px; }
+button:active { background:#162b63; }
+.footer { text-align:center; font-size:12px; color:#888; margin-top:25px; }
+</style>
+</head>
+<body>
+
+<div class="app" id="loginDiv">
+  <div class="header">
+    <h1>🔑 Login</h1>
+    <p>Enter your credentials</p>
+  </div>
+  <div class="field">
+    <label>Username</label>
+    <input type="text" id="username" placeholder="Username">
+  </div>
+  <div class="field">
+    <label>Password</label>
+    <input type="password" id="password" placeholder="Password">
+  </div>
+  <button onclick="login()">Login</button>
+  <div class="status" id="loginStatus"></div>
+</div>
+
+<div class="app" id="formDiv" style="display:none;">
+  <div class="header">
+    <h1>📸 BBRY ACTION TAKEN REPORT</h1>
+    <p>Account-based data capture</p>
+  </div>
+  <div class="field">
+    <label>Account ID</label>
+    <input type="text" id="accountId" placeholder="Enter Account ID" required>
+  </div>
+  <div class="field">
+    <label>ATR</label>
+    <input type="text" id="atr" placeholder="Enter ATR value">
+  </div>
+  <div class="field camera">
+    <label>Capture Site Photo</label>
+    <input type="file" id="photo" accept="image/*" capture="environment">
+  </div>
+  <div class="status" id="gpsStatus">📍 Getting GPS location…</div>
+  <button onclick="submitData()">Submit Data</button>
+  <div class="footer">Field Survey System By Mayank Bajpai (EDD I ORAI)</div>
+</div>
+
+<script>
+let latitude="", longitude="", gpsReady=false, userId="";
+
+// GPS capture
+navigator.geolocation.getCurrentPosition(
+  pos=>{ latitude=pos.coords.latitude; longitude=pos.coords.longitude; gpsReady=true; document.getElementById("gpsStatus").innerText="📍 Location captured"; },
+  err=>{ gpsReady=false; document.getElementById("gpsStatus").innerText="❌ GPS permission required"; },
+  { enableHighAccuracy:true, timeout:10000 }
+);
+
+// Login function
+function login() {
+  const username = document.getElementById("username").value.trim();
+  const password = document.getElementById("password").value.trim();
+  if (!username || !password) { alert("Enter username and password"); return; }
+
+  // Send login to Web App
+  fetch("https://script.google.com/macros/s/AKfycbwhj4kdunJHqCI_PSBd-Tlg6NY0otsKRmUO98mSM6YBd3lhDVCj8QMFCuzOYypGqbsI/exec", {
+    method: "POST",
+    body: JSON.stringify({ username, password, type: "login" })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.status === "success") {
+      userId = username;
+      document.getElementById("loginDiv").style.display = "none";
+      document.getElementById("formDiv").style.display = "block";
+    } else {
+      document.getElementById("loginStatus").innerText = "❌ Invalid credentials";
+    }
+  })
+  .catch(() => alert("❌ Network error"));
+}
+
+
+// Submit ATR
+function submitData() {
+  if(!gpsReady){ alert("GPS not ready. Allow location access."); return; }
+  const accountId=document.getElementById("accountId").value.trim();
+  const atr=document.getElementById("atr").value.trim();
+  const photoFile=document.getElementById("photo").files[0];
+  if(!accountId){ alert("Account ID required"); return; }
+  if(!photoFile){ alert("Please capture a photo"); return; }
+
+  const reader=new FileReader();
+  reader.onloadend=()=>{
+    const payload={ accountId, atr, latitude, longitude, photo:reader.result.split(",")[1], userId };
+
+    fetch("https://script.google.com/macros/s/AKfycbwhj4kdunJHqCI_PSBd-Tlg6NY0otsKRmUO98mSM6YBd3lhDVCj8QMFCuzOYypGqbsI/exec", { method:"POST", body:JSON.stringify(payload) })
+      .then(res=>res.json())
+      .then(data=>{
+        if(data.status==="success"){
+          alert("✅ Data updated successfully");
+          document.getElementById("photo").value="";
+          document.getElementById("accountId").value="";
+          document.getElementById("atr").value="";
+        } else {
+          alert("❌ "+data.message);
+        }
+      }).catch(()=>alert("❌ Network error"));
+  };
+  reader.readAsDataURL(photoFile);
+}
+</script>
+
+</body>
+</html>
